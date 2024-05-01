@@ -1,0 +1,43 @@
+name: pre-commit-bash
+
+inputs:
+  token:
+    description: 'token to perform git commits'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: adjust the path so scripts in this repo can be run
+      run: echo "${{ github.action_path }}" >> $GITHUB_PATH
+      shell: bash
+
+    - name: setup python which pre-commit uses
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: set PY
+      run: echo "PY=$(python -VV | sha256sum | cut -d' ' -f1)" >> "$GITHUB_ENV"
+      shell: bash
+
+    - name: cache pip installations and pre-commit installations
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/pip
+          ~/.cache/pre-commit
+        key: pre-commit|${{ env.PY }}|${{ hashFiles('.pre-commit-config.yaml') }}
+
+    - name: get changed files
+      id: changed-files
+      uses: tj-actions/changed-files@5e85e31a0187e8df23b438284aa04f21b55f1510
+
+    - name: run precommit wrapper
+      run: pre-commit-bash.sh
+      shell: bash
+      env:
+        # FIXME: our gh script seems to need GITHUB_TOKEN but runner wants GH_TOKEN
+        GH_TOKEN: ${{ inputs.token }}
+        GITHUB_TOKEN: ${{ inputs.token }}
+        CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
